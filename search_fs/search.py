@@ -4,13 +4,15 @@ import sys
 import argparse
 from search_fs import DEFAULT_DB_FILE, DIRECTORY_TYPE, FILE_TYPE
 
-
-def _dir_clause(dirs):
-    for dir in dirs:
-        yield
+SUFFIXES = ['B', 'KB', 'MB', 'GB', 'TB']
 
 
-def where_clause(name, type, dirs, strict_dir):
+def where_clause(ns):
+    name = ns.name
+    type = ns.type
+    dirs = ns.directories
+    strict_dir = ns.strict_dir
+    size = ns.size
     args = []
     queries = []
     if dirs:
@@ -18,7 +20,7 @@ def where_clause(name, type, dirs, strict_dir):
             dirs = [os.path.abspath(d) for d in dirs]
             parent_query = ' OR '.join('parent = ?' for i in range(len(dirs)))
         else:
-            dirs = [os.path.abspath(d)+'%' for d in dirs]
+            dirs = [os.path.abspath(d) + '%' for d in dirs]
             parent_query = ' OR '.join('parent like ?' for i in range(len(dirs)))
         queries.append('(' + parent_query + ')')
         args.extend(dirs)
@@ -32,13 +34,32 @@ def where_clause(name, type, dirs, strict_dir):
             args.append(FILE_TYPE)
         elif type == 'd':
             args.append(DIRECTORY_TYPE)
+    if size is not None:
+        size = size.upper()
+        if not (size.startswith('+') or size.startswith('-')):
+            size = '+' + size
+        if not size.endswith('B'):
+            size = size + 'B'
+        num = float(size[1:-2])
+        suffix = size[-2:]
+        try:
+            num = num * (1024 ** SUFFIXES.index(suffix))
+        except ValueError:
+            print('Unknown suffix for {}'.format(ns.size))
+            sys.exit(2)
+        if size.startswith('+'):
+            queries.append('size >= ?')
+        elif size.startswith('-'):
+            queries.append('size <= ?')
+        args.append(num)
+
     return ' AND '.join(queries), args
 
 
 def search(ns):
     end_char = '\0' if ns.zero else '\n'
     with sqlite3.connect(ns.database) as conn:
-        where, args = where_clause(ns.name, ns.type, ns.directories, ns.strict_dir)
+        where, args = where_clause(ns)
         query = 'select path from files where ' + where
         c = conn.cursor()
         c.execute(query, args)
@@ -52,9 +73,10 @@ def main():
                         help='The database file to use. Defaults to {}'.format(DEFAULT_DB_FILE))
     parser.add_argument('--name', '-n', help='Search by name')
     parser.add_argument('--type', '-t', choices=['f', 'd'], help='Search by type')
+    parser.add_argument('--size', '-s', help='Search by size. Prepend with + for greater, or - for less.')
     parser.add_argument('-0', dest='zero', action='store_const', const=True, default=False,
                         help='Output results separated by null byte (for xargs -0)')
-    parser.add_argument('--strict-dir', '-s', dest='strict_dir', action='store_const', const=True, default=False,
+    parser.add_argument('--strict-dir', '-d', dest='strict_dir', action='store_const', const=True, default=False,
                         help='Match only exact directories instead of walking the tree')
     parser.add_argument('directories', metavar='dir', nargs='*')
 
