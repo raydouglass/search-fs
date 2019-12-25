@@ -82,7 +82,7 @@ def main():
 
     ns = parser.parse_args()
 
-    if not (ns.name or ns.type):
+    if not (ns.name or ns.type or ns.size):
         print('Please specify name or type for searching')
         sys.exit(1)
     search(ns)
