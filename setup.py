@@ -20,5 +20,11 @@ setup(name='search-fs',
               'create-search-fs=search_fs.create_db:main'
           ],
       },
-      install_requires=[]
+      install_requires=[],
+      python_requires='>=3.6',
+      classifiers=[
+          "Programming Language :: Python :: 3",
+          "License :: OSI Approved :: Apache Software License",
+          "Operating System :: OS Independent",
+      ]
       )
