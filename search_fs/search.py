@@ -28,7 +28,7 @@ def where_clause(ns):
         name = name.replace('*', '%')
         args.append(name)
         queries.append('name like ?')
-    if type:
+    if type and type in ('f', 'd'):
         queries.append('type = ?')
         if type == 'f':
             args.append(FILE_TYPE)
@@ -57,14 +57,19 @@ def where_clause(ns):
 
 
 def search(ns):
-    end_char = '\0' if ns.zero else '\n'
     with sqlite3.connect(ns.database) as conn:
         where, args = where_clause(ns)
         query = 'select path from files where ' + where
         c = conn.cursor()
         c.execute(query, args)
         for row in c:
-            print(row[0], end=end_char)
+            yield row[0]
+
+
+def search_and_print(ns):
+    end_char = '\0' if ns.zero else '\n'
+    for row in search(ns):
+        print(row, end=end_char)
 
 
 def main():
@@ -83,6 +88,6 @@ def main():
     ns = parser.parse_args()
 
     if not (ns.name or ns.type or ns.size):
-        print('Please specify name or type for searching')
+        print('Please specify name/size/type for searching')
         sys.exit(1)
-    search(ns)
+    search_and_print(ns)
