@@ -3,12 +3,14 @@ import sqlite3
 import sys
 import argparse
 from search_fs import DEFAULT_DB_FILE, DIRECTORY_TYPE, FILE_TYPE
+import re
 
 SUFFIXES = ['B', 'KB', 'MB', 'GB', 'TB']
 
 
-def where_clause(ns):
+def where_clause(ns, conn):
     name = ns.name
+    regex = ns.regex
     type = ns.type
     dirs = ns.directories
     strict_dir = ns.strict_dir
@@ -28,6 +30,14 @@ def where_clause(ns):
         name = name.replace('*', '%')
         args.append(name)
         queries.append('name like ?')
+    if regex:
+        p = re.compile(regex)
+
+        def regex(item):
+            return p.match(item) is not None
+
+        queries.append('regex(name)')
+        conn.create_function("regex", 1, regex)
     if type and type in ('f', 'd'):
         queries.append('type = ?')
         if type == 'f':
@@ -58,7 +68,7 @@ def where_clause(ns):
 
 def search(ns):
     with sqlite3.connect(ns.database) as conn:
-        where, args = where_clause(ns)
+        where, args = where_clause(ns, conn)
         query = 'select path from files where ' + where
         c = conn.cursor()
         c.execute(query, args)
@@ -77,6 +87,7 @@ def main():
     parser.add_argument('--database', '--db', default=DEFAULT_DB_FILE,
                         help='The database file to use. Defaults to {}'.format(DEFAULT_DB_FILE))
     parser.add_argument('--name', '-n', help='Search by name')
+    parser.add_argument('--regex', '-r', help='Search by regex on name')
     parser.add_argument('--type', '-t', choices=['f', 'd'], help='Search by type')
     parser.add_argument('--size', '-s', help='Search by size. Prepend with + for greater, or - for less.')
     parser.add_argument('-0', dest='zero', action='store_const', const=True, default=False,
@@ -87,7 +98,7 @@ def main():
 
     ns = parser.parse_args()
 
-    if not (ns.name or ns.type or ns.size):
+    if not (ns.name or ns.type or ns.size or ns.regex):
         print('Please specify name/size/type for searching')
         sys.exit(1)
     search_and_print(ns)
