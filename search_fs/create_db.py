@@ -27,8 +27,9 @@ def walk(input_dirs):
                 yield path, dir, dirname, DIRECTORY_TYPE, 0
 
 
-def create_db(db_file, input_dirs):
-    print('Indexing {} directories'.format(len(input_dirs)))
+def create_db(db_file, input_dirs, verbose):
+    if verbose:
+        print('Indexing {} directories'.format(len(input_dirs)))
     temp_db = db_file + '.temp'
     if os.path.exists(temp_db):
         os.remove(temp_db)
@@ -40,14 +41,16 @@ def create_db(db_file, input_dirs):
         results = walk(input_dirs)
         for split in split_every(10000, results):
             file_count += len(split)
-            print('Processed {} files'.format(file_count))
+            if verbose:
+                print('Processed {} files'.format(file_count))
             conn.executemany('insert into files(path, parent, name, type, size) values (?,?,?,?,?)', split)
         conn.execute('create index parent_idx on files(parent)')
         conn.execute('create index name_idx on files(name)')
         conn.execute('create index size_idx on files(size)')
     os.replace(src=temp_db, dst=db_file)
     end = time.time()
-    print('Completed in {0:.2f}s'.format(end - start))
+    if verbose:
+        print('Completed in {0:.2f}s'.format(end - start))
 
 
 def main():
@@ -55,6 +58,7 @@ def main():
     parser.add_argument('--output', '-o', default=DEFAULT_DB_FILE,
                         help='The output database file. Defaults to {}'.format(DEFAULT_DB_FILE))
     parser.add_argument('--dirs', metavar='FILE', help='File containing a list of directories to index')
+    parser.add_argument('--verbose', '-v', action='store_const', default=False, const=True, help='Verbose mode')
     parser.add_argument('directories', metavar='dir', nargs='*')
 
     ns = parser.parse_args()
@@ -67,4 +71,4 @@ def main():
     if not directories:
         print('You must specify at least one directory to index')
         sys.exit(1)
-    create_db(ns.output, directories)
+    create_db(ns.output, directories, ns.verbose)
