@@ -70,6 +70,9 @@ def search(ns):
     with sqlite3.connect(ns.database) as conn:
         where, args = where_clause(ns, conn)
         query = 'select path from files where ' + where
+        if ns.debug:
+            print('Query='+query)
+            print('Args='+str(args))
         c = conn.cursor()
         c.execute(query, args)
         for row in c:
@@ -95,6 +98,8 @@ def main():
     parser.add_argument('--strict-dir', '-d', dest='strict_dir', action='store_const', const=True, default=False,
                         help='Match only exact directories instead of walking the tree')
     parser.add_argument('directories', metavar='dir', nargs='*')
+
+    parser.add_argument('--debug', action='store_const', const=True, default=False, help='Print extra debug information')
 
     ns = parser.parse_args()
 

@@ -14,17 +14,25 @@ def split_every(n, iterable):
         yield piece
         piece = list(islice(i, n))
 
+def strip_trailing_slash(dir):
+    if dir.endswith(os.sep):
+        return dir[:-1]
+    else:
+        return dir
 
 def walk(input_dirs):
     for input_dir in input_dirs:
         for dir, dirnames, filenames in os.walk(input_dir):
             for filename in filenames:
                 path = os.path.join(dir, filename)
-                size = os.stat(path, follow_symlinks=False).st_size
-                yield path, dir, filename, FILE_TYPE, size
+                try:
+                    size = os.stat(path, follow_symlinks=False).st_size
+                    yield path, strip_trailing_slash(dir), filename, FILE_TYPE, size
+                except FileNotFoundError:
+                    pass
             for dirname in dirnames:
                 path = os.path.join(dir, dirname)
-                yield path, dir, dirname, DIRECTORY_TYPE, 0
+                yield path, strip_trailing_slash(dir), dirname, DIRECTORY_TYPE, 0
 
 
 def create_db(db_file, input_dirs, verbose):

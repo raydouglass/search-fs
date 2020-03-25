@@ -51,6 +51,11 @@ search-fs --size '500M' #Files larger than 500MB
 search-fs --size='-10M' #Files smaller than 10MB, Note: make sure you use use '--size=' for less than
 ```
 
+Search by regular expression
+```shell script
+search-fs --regex '\w+\d\d?\.jpg'
+```
+
 ### Cron
 
 You can setup a cronjob to run `create-search-fs` so that the index is up to date.
