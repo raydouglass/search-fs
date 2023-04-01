@@ -53,6 +53,11 @@ search-fs --size='-10M' #Files smaller than 10MB, Note: make sure you use use '-
 
 Search by regular expression
 ```shell script
+search-fs --name '*.jpg' --format=size,name
+```
+
+Format the output
+```shell script
 search-fs --regex '\w+\d\d?\.jpg'
 ```
 
