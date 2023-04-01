@@ -1,6 +1,7 @@
 import os
 import sys
 import sqlite3
+from datetime import datetime
 from itertools import islice
 import argparse
 from search_fs import DEFAULT_DB_FILE, DIRECTORY_TYPE, FILE_TYPE
@@ -26,16 +27,21 @@ def walk(input_dirs):
             for filename in filenames:
                 path = os.path.join(dir, filename)
                 try:
-                    size = os.stat(path, follow_symlinks=False).st_size
-                    yield path, strip_trailing_slash(dir), filename, FILE_TYPE, size
+                    stat = os.stat(path, follow_symlinks=False)
+                    created_ts = datetime.fromtimestamp(stat.st_ctime)
+                    modified_ts = datetime.fromtimestamp(stat.st_mtime)
+                    yield strip_trailing_slash(dir), filename, FILE_TYPE, stat.st_size, created_ts, modified_ts
                 except FileNotFoundError:
                     pass
             for dirname in dirnames:
                 path = os.path.join(dir, dirname)
-                yield path, strip_trailing_slash(dir), dirname, DIRECTORY_TYPE, 0
+                stat = os.stat(path, follow_symlinks=False)
+                created_ts = datetime.fromtimestamp(stat.st_ctime)
+                modified_ts = datetime.fromtimestamp(stat.st_mtime)
+                yield strip_trailing_slash(dir), dirname, DIRECTORY_TYPE, None, created_ts, modified_ts
 
 
-def create_db(db_file, input_dirs, verbose):
+def create_db(db_file, input_dirs, verbose=False):
     if verbose:
         print('Indexing {} directories'.format(len(input_dirs)))
     temp_db = db_file + '.temp'
@@ -44,17 +50,19 @@ def create_db(db_file, input_dirs, verbose):
     start = time.time()
     with sqlite3.connect(temp_db) as conn:
         conn.execute(
-            'create table files(path text unique not null, parent text not null, name text not null, type integer not null, size integer not null)')
+            'create table files(parent text not null, name text not null, type integer not null, size integer, created timestamp, modified timestamp)')
         file_count = 0
         results = walk(input_dirs)
         for split in split_every(10000, results):
             file_count += len(split)
             if verbose:
                 print('Processed {} files'.format(file_count))
-            conn.executemany('insert into files(path, parent, name, type, size) values (?,?,?,?,?)', split)
+            conn.executemany('insert into files(parent, name, type, size, created, modified) values (?,?,?,?,?,?)', split)
         conn.execute('create index parent_idx on files(parent)')
         conn.execute('create index name_idx on files(name)')
         conn.execute('create index size_idx on files(size)')
+        conn.execute('create index created_idx on files(created)')
+        conn.execute('create index modified_idx on files(modified)')
     os.replace(src=temp_db, dst=db_file)
     end = time.time()
     if verbose:
@@ -79,4 +87,9 @@ def main():
     if not directories:
         print('You must specify at least one directory to index')
         sys.exit(1)
+    else:
+        for dir in directories:
+            if not os.path.isdir(dir):
+                print('Not a directory: {}'.format(dir))
+                sys.exit(2)
     create_db(ns.output, directories, ns.verbose)
